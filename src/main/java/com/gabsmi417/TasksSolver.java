@@ -11,6 +11,7 @@ import com.google.ortools.sat.LinearExpr;
 public class TasksSolver {
     protected final int numTasks;
     protected final int numWorkers;
+    protected final int maxTasksPerWorker;
     protected final long[] priorities;
     protected final long[] taskDurations;
 
@@ -20,12 +21,11 @@ public class TasksSolver {
     protected final CpSolver solver;
     protected CpSolverStatus status;
 
-    protected static final int MAX_TASKS_PER_WORKER = 3;
-
     public TasksSolver(
                 long[] priorities,
                 long[] taskDurations,
-                int numWorkers
+                int numWorkers,
+                int maxTasksPerWorker
     ) {
         this.numTasks = priorities.length;
         if (taskDurations.length != this.numTasks) {
@@ -34,6 +34,7 @@ public class TasksSolver {
         this.priorities = priorities;
         this.taskDurations = taskDurations;
         this.numWorkers = numWorkers;
+        this.maxTasksPerWorker = maxTasksPerWorker;
         this.model = new CpModel();
         this.solver = new CpSolver();
         initializeVariables();
@@ -76,13 +77,13 @@ public class TasksSolver {
     }
 
     private void initializeConstraints() {
-        // check that each worker is assigned to at most MAX_TASKS_PER_WORKER tasks
+        // check that each worker is assigned to at most maxTasksPerWorker tasks
         for (int j = 0; j < this.numWorkers; j++) {
             IntVar[] workerTasks = new IntVar[this.numTasks];
             for (int i = 0; i < this.numTasks; i++) {
                 workerTasks[i] = taskToWorkerVars[i][j];
             }
-            model.addLessOrEqual(LinearExpr.weightedSum(workerTasks, taskDurations), MAX_TASKS_PER_WORKER);
+            model.addLessOrEqual(LinearExpr.weightedSum(workerTasks, taskDurations), maxTasksPerWorker);
         }
 
         // check that each task is assigned to at most one workers if done

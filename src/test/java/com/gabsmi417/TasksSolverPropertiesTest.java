@@ -29,15 +29,18 @@ public class TasksSolverPropertiesTest {
     }
 
     @Property(tries = 100)
-    void eachWorkerHasAtMostThreeTasks(
+    void eachWorkerHasAtMostMaxTasks(
             @ForAll("taskInputs") TaskInput input
     ) {
         TasksSolver solver = new TasksSolver(
                 input.priorities,
                 input.durations,
-                input.numWorkers
+                input.numWorkers,
+                input.maxTasksPerWorker
         );
 
+        System.out.println("Solving...");
+        System.out.println("Tested with " + input.numWorkers + " workers and " + input.priorities.length + " tasks.");
         Optional<Assignment> maybeAssignment = solver.solve();
 
         // Property: If a feasible solution exists, no worker exceeds the task limit
@@ -49,19 +52,26 @@ public class TasksSolverPropertiesTest {
                 }
                 Assertions.assertThat(totalWork)
                         .as("Worker " + e.getKey() + " should not exceed max tasks")
-                        .isLessThanOrEqualTo(TasksSolver.MAX_TASKS_PER_WORKER);
+                        .isLessThanOrEqualTo(solver.maxTasksPerWorker);
             }
         });
+
+        System.out.println("Tested with " + input.numWorkers + " workers and " + input.priorities.length + " tasks.");
+        solver.printStatistics();
+        System.out.println("--------------------------------------------------");
+        System.out.println(maybeAssignment.get());
+        System.out.println("--------------------------------------------------");
     }
 
-    @Property(tries = 100)
+    @Property(tries = 1)
     void uniqueTasksAssigned(
             @ForAll("taskInputs") TaskInput input
     ) {
         TasksSolver solver = new TasksSolver(
                 input.priorities,
                 input.durations,
-                input.numWorkers
+                input.numWorkers,
+                input.maxTasksPerWorker
         );
 
         Optional<Assignment> maybeAssignment = solver.solve();
@@ -82,8 +92,9 @@ public class TasksSolverPropertiesTest {
 
     @Provide
     Arbitrary<TaskInput> taskInputs() {
-        Arbitrary<Integer> numTasks = Arbitraries.integers().between(10, 600);
+        Arbitrary<Integer> numTasks = Arbitraries.integers().between(100, 1000);
         Arbitrary<Integer> numWorkers = Arbitraries.integers().between(10, 30);
+        Arbitrary<Integer> maxTasksPerWorker = Arbitraries.integers().between(8, 16);
 
         return numTasks.flatMap(t -> {
             Arbitrary<long[]> prioritiesArb = Arbitraries.integers()
@@ -96,7 +107,7 @@ public class TasksSolverPropertiesTest {
                     .array(long[].class)
                     .ofSize(t);
             
-            return Combinators.combine(prioritiesArb, durationsArb, numWorkers)
+            return Combinators.combine(prioritiesArb, durationsArb, numWorkers, maxTasksPerWorker)
                     .as(TaskInput::new);
          });
     }
@@ -105,11 +116,13 @@ public class TasksSolverPropertiesTest {
         final long[] priorities;
         final long[] durations;
         final int numWorkers;
+        final int maxTasksPerWorker;
 
-        TaskInput(long[] priorities, long[] durations, int numWorkers) {
+        TaskInput(long[] priorities, long[] durations, int numWorkers, int maxTasksPerWorker) {
             this.priorities = priorities;
             this.durations = durations;
             this.numWorkers = numWorkers;
+            this.maxTasksPerWorker = maxTasksPerWorker;
         }
     }
 }

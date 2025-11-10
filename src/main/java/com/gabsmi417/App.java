@@ -15,7 +15,8 @@ public class App
         TasksSolver ts = new TasksSolver(
                 new long[]{3, 2, 2, 4, 4, 4, 4, 4}, 
                 new long[]{2, 3, 1, 3, 3, 3, 3, 3},
-                2
+                2,
+                3
         );
         Optional<Assignment> a = ts.solve();
 

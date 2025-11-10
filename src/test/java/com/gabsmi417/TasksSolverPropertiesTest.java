@@ -2,7 +2,6 @@ package com.gabsmi417;
 
 import java.util.Map;
 import java.util.Optional;
-import java.util.Random;
 
 import org.assertj.core.api.Assertions;
 
@@ -29,7 +28,7 @@ public class TasksSolverPropertiesTest {
         }
     }
 
-    @Property(tries = 10)
+    @Property(tries = 100)
     void eachWorkerHasAtMostThreeTasks(
             @ForAll("taskInputs") TaskInput input
     ) {
@@ -53,31 +52,55 @@ public class TasksSolverPropertiesTest {
                         .isLessThanOrEqualTo(TasksSolver.MAX_TASKS_PER_WORKER);
             }
         });
-
-        System.out.println("Size: " + input.priorities.length + ", Workers: " + input.numWorkers);
-        solver.printStatistics();
     }
 
-    // ---- Data generation ----
+    @Property(tries = 100)
+    void uniqueTasksAssigned(
+            @ForAll("taskInputs") TaskInput input
+    ) {
+        TasksSolver solver = new TasksSolver(
+                input.priorities,
+                input.durations,
+                input.numWorkers
+        );
 
-    @Provide
-    Arbitrary<TaskInput> taskInputs() {
-        Arbitrary<Integer> numTasks = Arbitraries.integers().between(4000, 10000);
-        Arbitrary<Integer> numWorkers = Arbitraries.integers().between(10, 30);
+        Optional<Assignment> maybeAssignment = solver.solve();
 
-        return Combinators.combine(numTasks, numWorkers).as((t, w) -> {
-            long[] priorities = new long[t];
-            long[] durations = new long[t];
-            Random r = new Random();
-            for (int i = 0; i < t; i++) {
-                priorities[i] = 1 + r.nextInt(5);
-                durations[i] = 1; // keep it simple
+        // Property: Each task is assigned to at most one worker
+        maybeAssignment.ifPresent(assignment -> {
+            boolean[] assignedTasks = new boolean[input.priorities.length];
+            for (Map.Entry<Integer, Integer[]> e : assignment.assignments.entrySet()) {
+                for (int task : e.getValue()) {
+                    Assertions.assertThat(assignedTasks[task])
+                            .as("Task " + task + " should be assigned to at most one worker")
+                            .isFalse();
+                    assignedTasks[task] = true;
+                }
             }
-            return new TaskInput(priorities, durations, w);
         });
     }
 
-    // ---- Helper record ----
+    @Provide
+    Arbitrary<TaskInput> taskInputs() {
+        Arbitrary<Integer> numTasks = Arbitraries.integers().between(10, 600);
+        Arbitrary<Integer> numWorkers = Arbitraries.integers().between(10, 30);
+
+        return numTasks.flatMap(t -> {
+            Arbitrary<long[]> prioritiesArb = Arbitraries.integers()
+                    .between(1, 10)
+                    .array(long[].class)
+                    .ofSize(t);
+
+            Arbitrary<long[]> durationsArb  = Arbitraries.integers()
+                    .between(1, 20)
+                    .array(long[].class)
+                    .ofSize(t);
+            
+            return Combinators.combine(prioritiesArb, durationsArb, numWorkers)
+                    .as(TaskInput::new);
+         });
+    }
+
     static class TaskInput {
         final long[] priorities;
         final long[] durations;
